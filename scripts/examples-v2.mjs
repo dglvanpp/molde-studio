@@ -1,0 +1,23 @@
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {PNG} from 'pngjs';import opentype from 'opentype.js';
+import {preprocessRgba,robustImageDefaults} from '../src/image-preprocess.js';
+import {traceMask} from '../src/potrace-pipeline.js';
+import {advancedDefaults as defaults} from '../src/advanced-config.js';
+import {buildDesign,triangulatePart} from '../src/geometry.js';
+import {createFemaleGrip} from '../src/advanced-geometry.js';
+import {serializeBinarySTL} from '../src/mesh.js';
+const image=readFileSync(new URL('../tests/fixtures/flower-canvas.png',import.meta.url));
+const loops=traceMask(preprocessRgba(PNG.sync.read(image),robustImageDefaults)).loops;
+const bytes=readFileSync(new URL('../public/fonts/Vera.ttf',import.meta.url));
+const font=opentype.parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+const out=new URL('../examples/v2/',import.meta.url);mkdirSync(out,{recursive:true});
+const report=[];
+function save(name,part){const ready=triangulatePart(part),data=serializeBinarySTL(ready.geometry);writeFileSync(new URL(name,out),new Uint8Array(data));report.push({file:name,triangles:ready.triangles,volumeMm3:ready.volume,boundsMm:ready.bbox,bytes:data.byteLength});}
+save('cortador-redondo-kokia.stl',buildDesign({loops,params:{...defaults,text:'KOKIA'},font}).parts[0]);
+const combo=buildDesign({loops,params:{...defaults,mode:'cutterStamp'}});
+combo.parts.forEach((p,i)=>save(['cortador-redondo.stl','sello-relieve-arriba.stl','agarre-redondo.stl'][i],p));
+for(const [gripShape,name] of [['heart','corazon'],['flower','flor'],['hex','hexagono']])save(`agarre-${name}.stl`,{name,geometry:createFemaleGrip({...defaults,gripShape})});
+save('agarre-corazon-logo.stl',{name:'Logo',geometry:createFemaleGrip({...defaults,gripShape:'heart'},[[[-1,-1],[1,-1],[0,1]]])});
+save('sello-mango-integrado.stl',buildDesign({loops,params:{...defaults,mode:'stamp',stampHandle:'integrated'}}).parts[0]);
+writeFileSync(new URL('imagen-prueba.png',out),image);writeFileSync(new URL('parametros.json',out),JSON.stringify(defaults,null,2));
+writeFileSync(new URL('verificacion.json',out),JSON.stringify(report,null,2));console.log(report.map(r=>`${r.file}: ${r.triangles} triángulos`).join('\n'));

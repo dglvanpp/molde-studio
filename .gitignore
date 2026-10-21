@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.sites-runtime/
+# Copia histórica del proyecto incluida durante el desarrollo; la fuente activa
+# está en la raíz y es la única que se publica.
+molde-studio/
